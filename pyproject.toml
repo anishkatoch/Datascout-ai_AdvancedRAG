@@ -1,0 +1,45 @@
+[project]
+name = "rag-faiss-chat-with-data"
+version = "0.1.0"
+description = "Smart Data Assistant - RAG chatbot using FastAPI, pgvector, OpenAI, and LangChain"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    # API server
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    # Database
+    "sqlalchemy",
+    "alembic",
+    "psycopg2-binary",
+    "pgvector",
+    # Vector stores
+    "langchain-community",
+    "chromadb",
+    # Document parsing
+    "liteparse",
+    # Web scraping
+    "crawl4ai",
+    "playwright",
+    # HTTP client (API endpoint ingestion)
+    "httpx",
+    # AI / RAG
+    "openai",
+    "langchain",
+    "langchain-openai",
+    "langchain-text-splitters",
+    "tiktoken",
+    # Utilities
+    "python-dotenv",
+    "numpy",
+    "langchain-postgres>=0.0.17",
+    "langchain-chroma>=1.1.0",
+    "langchain-huggingface>=1.2.2",
+]
+
+[tool.uv]
+python-version = "3.13"
+
+[tool.uv.scripts]
+setup = "playwright install chromium"
