@@ -3,17 +3,26 @@ FROM python:3.13-slim
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+# Create non-root user matching HF Spaces UID
+RUN useradd -m -u 1000 appuser
+
 WORKDIR /app
 
-# Install dependencies first (cached layer)
+# Install dependencies (cached layer)
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project
 
-# Install Playwright browsers
+# Install Playwright to a fixed path so non-root user can access it
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright-browsers
 RUN uv run playwright install --with-deps chromium
 
 # Copy application code
 COPY . .
+
+# Create runtime directories and hand ownership to appuser
+RUN mkdir -p chroma_data logs && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8001
 
