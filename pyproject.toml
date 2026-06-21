@@ -56,9 +56,6 @@ dev = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
-[tool.uv]
-python-version = "3.13"
-
 [tool.uv.scripts]
 setup = "playwright install chromium"
 test  = "pytest tests/ -v"

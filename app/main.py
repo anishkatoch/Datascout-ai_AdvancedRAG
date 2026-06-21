@@ -1,7 +1,5 @@
 import logging
 import os
-import subprocess
-import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -19,9 +17,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Server starting — checking Playwright browser installation...")
-    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=False)
-    logger.info("Playwright ready. Server is up.")
+    logger.info("Server starting...")
     yield
     logger.info("Server shutting down.")
 
