@@ -78,9 +78,9 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 60px 56px;
+  padding: 40px 48px;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
   z-index: 1;
 }
 
@@ -208,10 +208,10 @@ html, body {
 }
 
 .al-demo-body {
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 /* Demo messages */
