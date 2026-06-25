@@ -1,3 +1,10 @@
+/* ── Auth guard — redirect to login if no token ──────────────── */
+(function() {
+  if (!localStorage.getItem('rag_auth_token')) {
+    window.location.replace('/auth.html');
+  }
+})();
+
 /* ── State ───────────────────────────────────────────────────── */
 const state = {
   sessionId:    null,
@@ -7,18 +14,108 @@ const state = {
   isProcessing: false,
   isReady:      false,
   advancedMode: false,
+  thinkingMode: false,
+  authToken:    null,
+  authUser:     null,
 };
 window._ragState = state; // expose for testing
 
 /* ── Init ────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  initAuth();
   initClientToken();
   initAdvancedMode();
+  initThinkingMode();
   setupTabs();
   setupDragDrop();
   setupFileInput();
   setupHeadersToggle();
 });
+
+function initTheme() {
+  const dark = localStorage.getItem('aria_dark_mode') === 'true';
+  if (dark) document.documentElement.classList.add('dark');
+
+  const btn = document.createElement('button');
+  btn.className = 'theme-toggle';
+  btn.title = 'Toggle dark mode';
+  btn.innerHTML = dark ? sunIcon() : moonIcon();
+  btn.addEventListener('click', () => {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('aria_dark_mode', isDark);
+    btn.innerHTML = isDark ? sunIcon() : moonIcon();
+  });
+  document.querySelector('.header-right').appendChild(btn);
+}
+
+function moonIcon() {
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+}
+function sunIcon() {
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+}
+
+function initAuth() {
+  state.authToken = localStorage.getItem('rag_auth_token');
+  try {
+    state.authUser = JSON.parse(localStorage.getItem('rag_auth_user') || 'null');
+  } catch (_) { state.authUser = null; }
+
+  if (!state.authToken) { window.location.replace('/auth.html'); return; }
+
+  const user = state.authUser;
+  if (!user) return;
+
+  // Inject user chip into header
+  const headerRight = document.querySelector('.header-right');
+  if (headerRight) {
+    const isGuest = user.role === 'guest';
+    const initials = (user.name || user.email || 'U')
+      .split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+
+    const chip = document.createElement('div');
+    chip.className = 'user-chip';
+    chip.innerHTML = `
+      <div class="user-avatar-sm">${initials}</div>
+      <div class="user-chip-info">
+        <span class="user-chip-name">${escHtml(user.name || user.email)}</span>
+        ${isGuest ? '<span class="user-chip-role">Guest</span>' : ''}
+      </div>
+      <button class="logout-btn" onclick="logout()" title="Sign out">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>`;
+    headerRight.appendChild(chip);
+  }
+}
+
+function logout() {
+  localStorage.removeItem('rag_auth_token');
+  localStorage.removeItem('rag_auth_user');
+  window.location.replace('/auth.html');
+}
+
+/* ── Auth headers helper ─────────────────────────────────────── */
+function authHeaders(extra = {}) {
+  return {
+    ...(state.authToken ? { 'Authorization': `Bearer ${state.authToken}` } : {}),
+    ...extra,
+  };
+}
+
+function handleAuthError(res) {
+  if (res.status === 401) {
+    localStorage.removeItem('rag_auth_token');
+    localStorage.removeItem('rag_auth_user');
+    window.location.replace('/auth.html');
+    return true;
+  }
+  return false;
+}
 
 function initClientToken() {
   let token = localStorage.getItem('rag_client_token');
@@ -47,6 +144,22 @@ function initAdvancedMode() {
     });
     const label = document.getElementById('advanced-label');
     if (label) label.textContent = state.advancedMode ? 'Advanced Mode: ON' : 'Advanced Mode: OFF';
+  }
+}
+
+function initThinkingMode() {
+  state.thinkingMode = localStorage.getItem('rag_thinking_mode') === 'true';
+  const toggle = document.getElementById('thinking-toggle');
+  if (toggle) {
+    toggle.checked = state.thinkingMode;
+    toggle.addEventListener('change', () => {
+      state.thinkingMode = toggle.checked;
+      localStorage.setItem('rag_thinking_mode', state.thinkingMode);
+      const label = document.getElementById('thinking-label');
+      if (label) label.textContent = state.thinkingMode ? 'Thinking Mode: ON' : 'Thinking Mode: OFF';
+    });
+    const label = document.getElementById('thinking-label');
+    if (label) label.textContent = state.thinkingMode ? 'Thinking Mode: ON' : 'Thinking Mode: OFF';
   }
 }
 
@@ -239,7 +352,7 @@ class ProgressCard {
     const div = document.createElement('div');
     div.className = 'message bot';
     div.innerHTML = `
-      <div class="bot-avatar">AI</div>
+      <div class="bot-avatar">AR</div>
       <div>
         <div class="bubble progress-card">
           <div class="progress-title">${escHtml(title)}</div>
@@ -400,7 +513,7 @@ async function sendDedupAction(confirmToken, action, btn) {
   try {
     const res = await fetch('/upload/confirm', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ confirm_token: confirmToken, action }),
     });
     if (!res.ok) {
@@ -436,7 +549,7 @@ async function processSource() {
     const apiHeaders = collectHeaders();
     setProcessing(true);
     try {
-      const res  = await fetch('/upload/api', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, headers: apiHeaders }) });
+      const res  = await fetch('/upload/api', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ url, headers: apiHeaders }) });
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data?.detail || `Server error ${res.status}`);
       onProcessed(data.session_id);
@@ -459,9 +572,10 @@ async function processFiles() {
     const res = await fetch('/upload/files', {
       method: 'POST',
       body: form,
-      headers: { 'X-Client-Token': state.clientToken || 'anonymous' },
+      headers: authHeaders({ 'X-Client-Token': state.clientToken || 'anonymous' }),
     });
     if (!res.ok) {
+      if (handleAuthError(res)) return;
       const data = await safeJson(res);
       throw new Error(data?.detail || `Server error ${res.status}`);
     }
@@ -480,10 +594,11 @@ async function processUrl(url) {
   try {
     const res = await fetch('/upload/url', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ url }),
     });
     if (!res.ok) {
+      if (handleAuthError(res)) return;
       const data = await safeJson(res);
       throw new Error(data?.detail || `Server error ${res.status}`);
     }
@@ -512,7 +627,7 @@ function onProcessed(sessionId) {
   input.focus();
 
   clearWelcome();
-  appendMessage('bot', 'Your data is ready! Ask me anything about it.');
+  appendMessage('bot', "Your data is ready! I'm ARIA — ask me anything about it.");
 }
 
 /* ── Chat ────────────────────────────────────────────────────── */
@@ -536,12 +651,14 @@ async function sendMessage() {
   try {
     const res  = await fetch('/chat/', {
       method: 'POST',
-      headers: {
+      headers: authHeaders({
         'Content-Type':    'application/json',
-        'X-Advanced-Mode': state.advancedMode ? 'true' : 'false',
-      },
+        'X-Advanced-Mode':  state.advancedMode  ? 'true' : 'false',
+        'X-Thinking-Mode':  state.thinkingMode  ? 'true' : 'false',
+      }),
       body: JSON.stringify({ session_id: state.sessionId, question }),
     });
+    if (handleAuthError(res)) return;
     const data = await safeJson(res);
     if (!res.ok) throw new Error(data?.detail || `Server error ${res.status}`);
     appendMessage('bot', data.answer, data.elapsed_ms, data.citations || []);
@@ -561,7 +678,7 @@ function appendMessage(role, text, elapsedMs = null, citations = []) {
   div.className = `message ${role}`;
 
   const avatarHtml = role === 'bot'
-    ? `<div class="bot-avatar">AI</div>`
+    ? `<div class="bot-avatar">AR</div>`
     : `<div class="user-avatar">👤</div>`;
 
   const content = role === 'bot'
@@ -674,12 +791,12 @@ function resetSession() {
       <div class="welcome-icon">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#g3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="g3" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#667eea"/><stop offset="1" stop-color="#764ba2"/></linearGradient></defs></svg>
       </div>
-      <h2 class="welcome-title">Welcome to RAG Assistant</h2>
-      <p class="welcome-sub">Upload files, paste a URL, or connect an API — then ask anything about your data.</p>
+      <h2 class="welcome-title">Hi, I'm ARIA ✦</h2>
+      <p class="welcome-greeting">Upload your data and I'll answer anything about it.</p>
       <div class="welcome-steps">
-        <div class="step"><span class="step-num">1</span> Choose a data source on the left</div>
-        <div class="step"><span class="step-num">2</span> Click "Process & Start Chat"</div>
-        <div class="step"><span class="step-num">3</span> Ask any question about your data</div>
+        <div class="step"><span class="step-num">1</span>Upload a file, URL, or API</div>
+        <div class="step"><span class="step-num">2</span>Click Process &amp; Chat</div>
+        <div class="step"><span class="step-num">3</span>Ask me anything</div>
       </div>
     </div>`;
 }

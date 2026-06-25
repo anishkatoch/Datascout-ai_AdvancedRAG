@@ -3,23 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RAG Data Assistant</title>
+  <title>ARIA — Chat with your Data</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
 
-  <!-- Toast container -->
   <div id="toast-container"></div>
 
   <!-- Full-page drag overlay -->
   <div id="drag-overlay" class="drag-overlay hidden">
     <div class="drag-overlay-inner">
-      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      <p>Drop your files anywhere</p>
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p>Drop files to upload</p>
     </div>
   </div>
 
@@ -27,8 +26,16 @@
   <header class="header">
     <div class="header-left">
       <div class="logo">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#667eea"/><stop offset="1" stop-color="#764ba2"/></linearGradient></defs></svg>
-        <span class="logo-text">RAG Assistant</span>
+        <div class="aria-avatar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+              stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-text">ARIA</div>
+          <div class="logo-sub">AI Research Intelligence Assistant</div>
+        </div>
       </div>
     </div>
     <div class="header-right">
@@ -37,12 +44,20 @@
           <input type="checkbox" id="advanced-toggle" />
           <span class="advanced-toggle-slider"></span>
         </label>
-        <span id="advanced-label" class="advanced-label-text">Advanced Mode: OFF</span>
+        <span id="advanced-label" class="advanced-label-text">Advanced</span>
+      </div>
+      <div class="thinking-toggle-wrap">
+        <label class="thinking-toggle-label" for="thinking-toggle">
+          <input type="checkbox" id="thinking-toggle" />
+          <span class="thinking-toggle-slider"></span>
+        </label>
+        <span id="thinking-label" class="thinking-label-text">Thinking</span>
       </div>
       <div id="session-badge" class="session-badge hidden">
         <span class="session-dot"></span>
         <span id="session-label">Session Active</span>
       </div>
+      <!-- dark mode toggle injected by chat.js -->
     </div>
   </header>
 
@@ -53,59 +68,54 @@
     <aside class="sidebar">
       <div class="sidebar-title">Data Sources</div>
 
-      <!-- Source tabs -->
       <div class="tabs">
         <button class="tab active" data-tab="files">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Files
         </button>
         <button class="tab" data-tab="url">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           URL
         </button>
         <button class="tab" data-tab="api">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           API
         </button>
       </div>
 
-      <!-- FILES TAB -->
+      <!-- FILES -->
       <div class="tab-panel active" id="panel-files">
         <div class="limits-note">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          Up to 3 files · Max 15MB each · PDF, DOC, DOCX, TXT
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Up to 3 files · Max 15 MB · PDF, DOC, DOCX, TXT
         </div>
-
         <div class="drop-zone" id="drop-zone">
           <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.txt" hidden />
           <div class="drop-icon">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           </div>
-          <p class="drop-title">Drag & drop files here</p>
+          <p class="drop-title">Drag &amp; drop files here</p>
           <p class="drop-sub">or</p>
           <button class="browse-btn" onclick="document.getElementById('file-input').click()">Browse Files</button>
         </div>
-
         <div id="file-list" class="file-list"></div>
       </div>
 
-      <!-- URL TAB -->
+      <!-- URL -->
       <div class="tab-panel" id="panel-url">
         <label class="field-label">Web Page URL</label>
         <input type="url" id="url-input" class="text-input" placeholder="https://example.com/article" />
         <p class="field-hint">Works with any web page including JavaScript-rendered sites.</p>
       </div>
 
-      <!-- API TAB -->
+      <!-- API -->
       <div class="tab-panel" id="panel-api">
         <label class="field-label">API Endpoint URL</label>
         <input type="url" id="api-url-input" class="text-input" placeholder="https://api.example.com/data" />
-
         <button class="toggle-headers-btn" id="toggle-headers">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           Add Headers (optional)
         </button>
-
         <div id="headers-panel" class="headers-panel hidden">
           <div id="headers-list">
             <div class="header-row">
@@ -118,42 +128,43 @@
         </div>
       </div>
 
-      <!-- Process button -->
       <button class="process-btn" id="process-btn" onclick="processSource()">
-        <span class="btn-text">Process & Start Chat</span>
+        <span class="btn-text">Process &amp; Chat with ARIA</span>
         <span class="btn-spinner hidden"></span>
       </button>
 
-      <!-- Reset -->
       <button class="reset-btn hidden" id="reset-btn" onclick="resetSession()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>
         New Session
       </button>
     </aside>
 
-    <!-- Chat area -->
+    <!-- Chat -->
     <section class="chat-area">
       <div class="messages" id="messages">
-        <!-- Welcome -->
         <div class="welcome">
-          <div class="welcome-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#g2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="g2" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#667eea"/><stop offset="1" stop-color="#764ba2"/></linearGradient></defs></svg>
+          <div class="aria-welcome-avatar">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </div>
-          <h2 class="welcome-title">Welcome to RAG Assistant</h2>
-          <p class="welcome-sub">Upload files, paste a URL, or connect an API — then ask anything about your data.</p>
+          <h2 class="welcome-title">Hi, I'm ARIA ✦</h2>
+          <p class="welcome-greeting">Your AI Research Intelligence Assistant.<br/>Upload your data and I'll answer anything about it.</p>
           <div class="welcome-steps">
-            <div class="step"><span class="step-num">1</span> Choose a data source on the left</div>
-            <div class="step"><span class="step-num">2</span> Click "Process & Start Chat"</div>
-            <div class="step"><span class="step-num">3</span> Ask any question about your data</div>
+            <div class="step"><span class="step-num">1</span>Upload a file, URL, or API</div>
+            <div class="step"><span class="step-num">2</span>Click Process &amp; Chat</div>
+            <div class="step"><span class="step-num">3</span>Ask me anything</div>
           </div>
         </div>
       </div>
 
       <!-- Typing indicator -->
       <div class="typing-indicator hidden" id="typing">
-        <div class="bot-avatar small">AI</div>
-        <div class="typing-dots">
-          <span></span><span></span><span></span>
+        <div class="bot-avatar small">AR</div>
+        <div class="typing-bubble">
+          <div class="typing-label">ARIA is thinking...</div>
+          <div class="typing-dots"><span></span><span></span><span></span></div>
         </div>
       </div>
 
@@ -162,7 +173,7 @@
         <textarea
           id="chat-input"
           class="chat-input"
-          placeholder="Process a data source first to start chatting..."
+          placeholder="Ask ARIA anything about your data..."
           disabled
           rows="1"
           onInput="autoResize(this)"

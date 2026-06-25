@@ -23,24 +23,13 @@ EMBED_BATCH_SIZE = 32
 
 
 def _add_texts_batched(store, texts: list[str], metadatas: list[dict]) -> None:
-    """Embed and store in fixed-size batches to avoid HF API payload/timeout limits."""
-    total_batches = -(-len(texts) // EMBED_BATCH_SIZE)  # ceiling division
+    """Call store.add_texts in fixed-size batches to avoid HF API payload/timeout limits."""
+    total_batches = -(-len(texts) // EMBED_BATCH_SIZE)
     for i in range(0, len(texts), EMBED_BATCH_SIZE):
         batch_t = texts[i: i + EMBED_BATCH_SIZE]
         batch_m = metadatas[i: i + EMBED_BATCH_SIZE]
         store.add_texts(batch_t, metadatas=batch_m)
         logger.info(f"[EMBED] batch {i // EMBED_BATCH_SIZE + 1}/{total_batches} — {len(batch_t)} chunks")
-
-EMBED_BATCH_SIZE = 32  # max chunks per HuggingFace API call
-
-
-def _add_texts_batched(store, texts: list[str], metadatas: list[dict]) -> None:
-    """Call store.add_texts in fixed-size batches to avoid HF API payload/timeout limits."""
-    for i in range(0, len(texts), EMBED_BATCH_SIZE):
-        batch_t = texts[i: i + EMBED_BATCH_SIZE]
-        batch_m = metadatas[i: i + EMBED_BATCH_SIZE]
-        store.add_texts(batch_t, metadatas=batch_m)
-        logger.info(f"[EMBED] batch {i // EMBED_BATCH_SIZE + 1}/{-(-len(texts) // EMBED_BATCH_SIZE)} — {len(batch_t)} chunks")
 
 
 async def _build_graph_async(chunks: list[str], session_id: str, filename: str):
@@ -390,7 +379,7 @@ async def ingest_url(
             text = await scrape_url(url)
         except Exception as e:
             logger.error(f"[URL] Scrape failed: {e}")
-            yield sse({"type": "error", "message": f"Failed to scrape URL: {e}"})
+            yield sse({"type": "error", "message": "Failed to scrape the URL. Please check the URL and try again."})
             return
         elapsed = round(time.time() - t1, 2)
         yield sse({"type": "step", "status": "done", "stage": "scrape",
@@ -417,7 +406,7 @@ async def ingest_url(
             vector_store.add_texts(chunks, metadatas=metadatas)
         except Exception as e:
             logger.error(f"[URL] Embed/store failed: {e}")
-            yield sse({"type": "error", "message": f"Storage failed: {e}"})
+            yield sse({"type": "error", "message": "Failed to process and store the content. Please try again."})
             return
         elapsed = round(time.time() - t1, 2)
         yield sse({"type": "step", "status": "done", "stage": "embed",
@@ -443,7 +432,7 @@ async def ingest_api(request: APIIngestRequest):
         text = await fetch_api(request.url, request.headers)
     except Exception as e:
         logger.error(f"[API] Fetch failed — url={request.url}, error={e}")
-        raise HTTPException(422, f"Failed to fetch API: {e}")
+        raise HTTPException(422, "Failed to fetch data from the API. Please check the URL and headers.")
 
     chunks       = chunk_text(text)
     vector_store = get_vector_store(str(session_id))

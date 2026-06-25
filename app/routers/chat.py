@@ -14,12 +14,15 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 async def chat(
     request: ChatRequest,
     x_advanced_mode: str = Header(default="false"),
+    x_thinking_mode: str = Header(default="false"),
 ):
     t0 = time.time()
-    advanced = x_advanced_mode.lower() == "true"
+    advanced  = x_advanced_mode.lower() == "true"
+    thinking  = x_thinking_mode.lower() == "true"
     logger.info(
         f"[CHAT] Request — session={request.session_id}, "
-        f"advanced={advanced}, question='{request.question[:80]}{'...' if len(request.question) > 80 else ''}'"
+        f"advanced={advanced}, thinking={thinking}, "
+        f"question='{request.question[:80]}{'...' if len(request.question) > 80 else ''}'"
     )
     try:
         vector_store = get_vector_store(str(request.session_id))
@@ -28,6 +31,7 @@ async def chat(
             question=request.question,
             session_id=str(request.session_id),
             advanced=advanced,
+            thinking=thinking,
         )
         logger.info(f"[CHAT] Done — session={request.session_id}, time={elapsed_ms}ms, citations={len(citations)}")
         return ChatResponse(
@@ -38,4 +42,4 @@ async def chat(
         )
     except Exception as e:
         logger.error(f"[CHAT] Error — session={request.session_id}, error={e}", exc_info=True)
-        raise HTTPException(500, f"Error generating response: {e}")
+        raise HTTPException(500, "An error occurred processing your question. Please try again.")

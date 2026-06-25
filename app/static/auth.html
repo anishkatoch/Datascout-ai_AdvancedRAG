@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARIA — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/auth.css" />
+</head>
+<body>
+
+<div class="auth-page">
+
+  <!-- ══════════════════ LEFT PANEL ══════════════════ -->
+  <div class="auth-left">
+
+    <!-- Decorative orbs -->
+    <div class="al-orb al-orb-1"></div>
+    <div class="al-orb al-orb-2"></div>
+    <div class="al-orb al-orb-3"></div>
+
+    <!-- Brand -->
+    <div class="al-brand">
+      <div class="al-logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+            stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="al-logo-name">ARIA</span>
+    </div>
+
+    <!-- Headline -->
+    <div class="al-headline">
+      <h1>Chat with your data.<br/>Get answers instantly.</h1>
+      <p>Upload documents, paste a URL, or connect any API — ARIA reads it all and answers your questions with precision.</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="al-stats">
+      <div class="al-stat">
+        <span class="al-stat-num">95%</span>
+        <span class="al-stat-label">Accuracy</span>
+      </div>
+      <div class="al-stat">
+        <span class="al-stat-num">&lt;6s</span>
+        <span class="al-stat-label">Response</span>
+      </div>
+      <div class="al-stat">
+        <span class="al-stat-num">100%</span>
+        <span class="al-stat-label">Cited</span>
+      </div>
+    </div>
+
+    <!-- Animated demo chat -->
+    <div class="al-demo">
+      <div class="al-demo-header">
+        <div class="al-demo-dot red"></div>
+        <div class="al-demo-dot yellow"></div>
+        <div class="al-demo-dot green"></div>
+        <span class="al-demo-title">Live preview</span>
+      </div>
+      <div class="al-demo-body">
+        <div class="demo-msg user msg-1">
+          <span>Why did Marcus Reed murder Benjamin?</span>
+        </div>
+        <div class="demo-typing msg-2">
+          <div class="dt-avatar">AR</div>
+          <div class="dt-dots"><span></span><span></span><span></span></div>
+        </div>
+        <div class="demo-msg aria msg-3">
+          <div class="dm-avatar">AR</div>
+          <span>Marcus Reed is the <strong>lead investigator</strong> assigned to the case in 2021, per page 4 of your document.</span>
+        </div>
+        <div class="demo-msg user msg-4">
+          <span>Why did he resign?</span>
+        </div>
+        <div class="demo-typing msg-5">
+          <div class="dt-avatar">AR</div>
+          <div class="dt-dots"><span></span><span></span><span></span></div>
+        </div>
+        <div class="demo-msg aria msg-6">
+          <div class="dm-avatar">AR</div>
+          <span>He resigned citing <strong>"irreconcilable differences"</strong> with the board following the internal audit findings.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div class="al-features">
+      <div class="al-feat">
+        <div class="al-feat-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <span>PDF, DOCX, TXT</span>
+      </div>
+      <div class="al-feat">
+        <div class="al-feat-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <span>Web Scraping</span>
+      </div>
+      <div class="al-feat">
+        <div class="al-feat-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <span>API Connect</span>
+      </div>
+      <div class="al-feat">
+        <div class="al-feat-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        </div>
+        <span>Thinking Mode</span>
+      </div>
+      <div class="al-feat">
+        <div class="al-feat-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <span>Graph Search</span>
+      </div>
+    </div>
+
+  </div><!-- /auth-left -->
+
+
+  <!-- ══════════════════ RIGHT PANEL ══════════════════ -->
+  <div class="auth-right">
+
+    <div class="auth-card">
+
+      <!-- Typing greeting -->
+      <div class="aria-greeting">
+        <span class="aria-greeting-dot"></span>
+        <span id="aria-greeting-text"></span><span class="aria-cursor">|</span>
+      </div>
+
+      <!-- Tab switcher -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="signin">Sign In</button>
+        <button class="auth-tab" data-tab="signup">Sign Up</button>
+        <button class="auth-tab guest-tab" data-tab="guest">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Guest
+        </button>
+      </div>
+
+      <!-- ── Sign In ── -->
+      <div class="auth-panel active" id="panel-signin">
+        <div class="panel-header">
+          <h2>Welcome back</h2>
+          <p>Sign in to continue with ARIA</p>
+        </div>
+        <form id="form-signin" onsubmit="handleSignin(event)">
+          <div class="field">
+            <label>Email</label>
+            <div class="input-wrap">
+              <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input type="email" id="signin-email" placeholder="you@example.com" autocomplete="email" required autofocus />
+            </div>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <div class="input-wrap">
+              <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input type="password" id="signin-password" placeholder="••••••••" autocomplete="current-password" required />
+              <button type="button" class="toggle-pw" onclick="togglePw('signin-password', this)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <button type="button" class="forgot-link" onclick="showForgot()">Forgot password?</button>
+          <div id="signin-error" class="form-error hidden"></div>
+          <button type="submit" class="submit-btn" id="btn-signin">
+            <span class="btn-label">Sign In</span>
+            <span class="btn-spinner hidden"></span>
+          </button>
+        </form>
+      </div>
+
+      <!-- ── Sign Up ── -->
+      <div class="auth-panel" id="panel-signup">
+        <div class="panel-header">
+          <h2>Create account</h2>
+          <p>Start chatting with your data for free</p>
+        </div>
+        <form id="form-signup" onsubmit="handleSignup(event)">
+          <div class="field">
+            <label>Full Name</label>
+            <div class="input-wrap">
+              <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <input type="text" id="signup-name" placeholder="John Doe" autocomplete="name" required />
+            </div>
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <div class="input-wrap">
+              <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email" required />
+            </div>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <div class="input-wrap">
+              <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input type="password" id="signup-password" placeholder="Min 6 characters" autocomplete="new-password" required minlength="6" oninput="checkPasswordStrength(this.value)" />
+              <button type="button" class="toggle-pw" onclick="togglePw('signup-password', this)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <div class="pw-strength" id="pw-strength">
+              <div class="pw-bar"><div id="pw-fill"></div></div>
+              <span id="pw-label"></span>
+            </div>
+          </div>
+          <div id="signup-error" class="form-error hidden"></div>
+          <div id="signup-success" class="form-success hidden"></div>
+          <button type="submit" class="submit-btn" id="btn-signup">
+            <span class="btn-label">Create Account</span>
+            <span class="btn-spinner hidden"></span>
+          </button>
+        </form>
+      </div>
+
+      <!-- ── Guest ── -->
+      <div class="auth-panel" id="panel-guest">
+        <div class="panel-header">
+          <h2>Continue as guest</h2>
+          <p>No account needed — just your name &amp; email</p>
+        </div>
+        <div class="guest-badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Guest sessions expire after 24 hours
+        </div>
+        <form id="form-guest" onsubmit="handleGuest(event)">
+          <div class="field">
+            <label>Your Name</label>
+            <div class="input-wrap">
+              <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <input type="text" id="guest-name" placeholder="John Doe" required />
+            </div>
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <div class="input-wrap">
+              <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input type="email" id="guest-email" placeholder="you@example.com" required />
+            </div>
+          </div>
+          <div id="guest-error" class="form-error hidden"></div>
+          <button type="submit" class="submit-btn guest-submit" id="btn-guest">
+            <span class="btn-label">Continue as Guest</span>
+            <span class="btn-spinner hidden"></span>
+          </button>
+        </form>
+      </div>
+
+      <!-- ── OTP ── -->
+      <div class="auth-panel" id="panel-otp">
+        <div class="panel-header">
+          <h2>Check your email</h2>
+          <p>Enter the 6-digit code sent to <strong id="otp-email-label"></strong></p>
+        </div>
+        <div class="otp-wrap">
+          <input class="otp-box" type="text" inputmode="numeric" maxlength="1" />
+          <input class="otp-box" type="text" inputmode="numeric" maxlength="1" />
+          <input class="otp-box" type="text" inputmode="numeric" maxlength="1" />
+          <input class="otp-box" type="text" inputmode="numeric" maxlength="1" />
+          <input class="otp-box" type="text" inputmode="numeric" maxlength="1" />
+          <input class="otp-box" type="text" inputmode="numeric" maxlength="1" />
+        </div>
+        <div id="otp-error" class="form-error hidden"></div>
+        <button type="button" class="submit-btn" id="btn-otp" onclick="handleOtp()">
+          <span class="btn-label">Verify Email</span>
+          <span class="btn-spinner hidden"></span>
+        </button>
+        <div class="otp-resend">
+          Didn't get a code?
+          <button type="button" id="resend-btn" class="resend-link" onclick="resendOtp()">Resend</button>
+          <span id="resend-timer" class="resend-timer hidden"></span>
+        </div>
+      </div>
+
+      <!-- ── Forgot Password ── -->
+      <div class="auth-panel" id="panel-forgot">
+        <div class="panel-header">
+          <h2>Reset password</h2>
+          <p>We'll send a reset link to your email</p>
+        </div>
+        <form id="form-forgot" onsubmit="handleForgot(event)">
+          <div class="field">
+            <label>Email</label>
+            <div class="input-wrap">
+              <svg class="input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input type="email" id="forgot-email" placeholder="you@example.com" required />
+            </div>
+          </div>
+          <div id="forgot-error" class="form-error hidden"></div>
+          <div id="forgot-success" class="form-success hidden"></div>
+          <button type="submit" class="submit-btn" id="btn-forgot">
+            <span class="btn-label">Send Reset Link</span>
+            <span class="btn-spinner hidden"></span>
+          </button>
+        </form>
+        <button class="back-link" onclick="showTab('signin')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to Sign In
+        </button>
+      </div>
+
+      <!-- Security note -->
+      <div class="security-note">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        We never store your password — secured by Supabase Auth
+      </div>
+
+    </div><!-- /auth-card -->
+  </div><!-- /auth-right -->
+
+</div><!-- /auth-page -->
+
+<script src="/auth.js"></script>
+</body>
+</html>
