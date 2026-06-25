@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>body{visibility:hidden}</style>
+  <script>if(!localStorage.getItem('rag_auth_token')){window.location.replace('/auth.html')}else{document.addEventListener('DOMContentLoaded',function(){document.body.style.visibility='visible'})}</script>
   <title>ARIA — Chat with your Data</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
