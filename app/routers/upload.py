@@ -19,17 +19,35 @@ from app.services import dedup as dedup_svc
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/upload", tags=["upload"])
 
-EMBED_BATCH_SIZE = 32
+EMBED_BATCH_SIZE  = 50   # chunks per HF API call (raised from 32 — fewer round-trips)
+EMBED_CONCURRENCY = 3    # parallel embed+insert batches
 
 
 def _add_texts_batched(store, texts: list[str], metadatas: list[dict]) -> None:
-    """Call store.add_texts in fixed-size batches to avoid HF API payload/timeout limits."""
+    """Sequential fallback — used for seeding the default session at startup."""
     total_batches = -(-len(texts) // EMBED_BATCH_SIZE)
     for i in range(0, len(texts), EMBED_BATCH_SIZE):
         batch_t = texts[i: i + EMBED_BATCH_SIZE]
         batch_m = metadatas[i: i + EMBED_BATCH_SIZE]
         store.add_texts(batch_t, metadatas=batch_m)
         logger.info(f"[EMBED] batch {i // EMBED_BATCH_SIZE + 1}/{total_batches} — {len(batch_t)} chunks")
+
+
+async def _add_texts_batched_parallel(store, texts: list[str], metadatas: list[dict]) -> None:
+    """Embed and insert in parallel batches — faster than sequential for large docs."""
+    batches = [
+        (texts[i: i + EMBED_BATCH_SIZE], metadatas[i: i + EMBED_BATCH_SIZE])
+        for i in range(0, len(texts), EMBED_BATCH_SIZE)
+    ]
+    total = len(batches)
+    sem = asyncio.Semaphore(EMBED_CONCURRENCY)
+
+    async def _run_batch(idx: int, batch_t: list, batch_m: list) -> None:
+        async with sem:
+            await asyncio.to_thread(store.add_texts, batch_t, metadatas=batch_m)
+            logger.info(f"[EMBED] batch {idx + 1}/{total} — {len(batch_t)} chunks")
+
+    await asyncio.gather(*[_run_batch(i, bt, bm) for i, (bt, bm) in enumerate(batches)])
 
 
 async def _build_graph_async(chunks: list[str], session_id: str, filename: str):
@@ -312,7 +330,7 @@ async def upload_files(
                 })
                 batch_texts.append(chunk)
             if batch_texts:
-                _add_texts_batched(master_store, batch_texts, batch_metas)
+                await _add_texts_batched_parallel(master_store, batch_texts, batch_metas)
             file_chunks   = len(batch_texts)
             total_chunks += file_chunks
             elapsed = round(time.time() - t1, 2)

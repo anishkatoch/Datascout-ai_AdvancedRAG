@@ -31,4 +31,4 @@ limits:
   max_file_size_mb: 15      # per-file cap
   max_files_per_session: 5  # max files in one chat session
   max_session_size_mb: 50   # total across all files in a session
-  dedup_threshold_mb: 0     # 0 = all files go through hash check regardless of size
+  dedup_threshold_mb: 2     # files under 2 MB skip TF-IDF similarity check (fast SHA-256 only)

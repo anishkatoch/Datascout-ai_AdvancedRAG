@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -16,16 +17,117 @@ setup_logging()
 
 logger = logging.getLogger(__name__)
 
-_STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+from app.config import DEFAULT_SESSION_ID
+
+_STATIC_DIR  = os.path.join(os.path.dirname(__file__), "static")
+_SAMPLE_FILE = os.path.join(os.path.dirname(__file__), "data", "sample-ai-overview.txt")
 
 # Routes that do NOT require authentication
 _PUBLIC_PREFIXES = ("/auth", "/health", "/auth.html", "/auth.css", "/auth.js")
 _PROTECTED_PREFIXES = ("/chat/", "/upload/")
 
 
+async def _seed_default_session():
+    """Ingest the sample file into the default session if not already done."""
+    try:
+        from app.services.vector_store import get_vector_store, session_has_data
+        from app.services.rag import chunk_text
+        from app.routers.upload import _add_texts_batched
+
+        if session_has_data(DEFAULT_SESSION_ID):
+            logger.info("[DEFAULT] Sample session already seeded — skipping")
+            return
+
+        with open(_SAMPLE_FILE, "r", encoding="utf-8") as f:
+            text = f.read()
+
+        chunks = chunk_text(text)
+        store = get_vector_store(DEFAULT_SESSION_ID)
+        metadatas = [{"source": "sample-ai-overview.txt", "chunk_index": i} for i in range(len(chunks))]
+        _add_texts_batched(store, chunks, metadatas)
+        logger.info(f"[DEFAULT] Sample seeded — {len(chunks)} chunks into session={DEFAULT_SESSION_ID}")
+    except Exception as e:
+        logger.warning(f"[DEFAULT] Could not seed sample session: {e}")
+
+
+async def _warmup_embeddings():
+    """Make a dummy embed call so the HF connection + credentials are validated before the first user."""
+    try:
+        from app.services.vector_store import get_embeddings
+        embeddings = get_embeddings()
+        await asyncio.to_thread(embeddings.embed_query, "warmup")
+        logger.info("[WARMUP] Embedding model ready")
+    except Exception as e:
+        logger.warning(f"[WARMUP] Embedding warmup failed: {e}")
+
+
+async def _warmup_bm25():
+    """Pre-build the BM25 index for the default session so the first retrieval is instant."""
+    try:
+        from app.services.vector_store import get_vector_store
+        from app.services.rag import _get_or_build_bm25
+        store = get_vector_store(DEFAULT_SESSION_ID)
+        _get_or_build_bm25(store, DEFAULT_SESSION_ID)
+        logger.info("[WARMUP] BM25 index ready for default session")
+    except Exception as e:
+        logger.warning(f"[WARMUP] BM25 warmup failed: {e}")
+
+
+async def _warmup_reranker():
+    """Make a dummy reranker call so the HF InferenceClient connection is established."""
+    try:
+        from huggingface_hub import InferenceClient
+        from app.config import cfg
+        client = InferenceClient(token=cfg.hf_api_key)
+        await asyncio.to_thread(
+            client.sentence_similarity,
+            "warmup query",
+            ["warmup passage"],
+            cfg.hf_model_id,
+        )
+        logger.info("[WARMUP] Reranker ready")
+    except Exception as e:
+        logger.warning(f"[WARMUP] Reranker warmup failed: {e}")
+
+
+async def _warmup_parser():
+    """Parse a minimal PDF so LiteParse initialises its internal models before the first user upload."""
+    try:
+        import tempfile
+        from app.services.ingestion import parse_file
+        # Minimal valid single-page PDF (no text content — just enough to trigger LiteParse init)
+        minimal_pdf = (
+            b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+            b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+            b"3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\n"
+            b"xref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n"
+            b"0000000058 00000 n \n0000000115 00000 n \n"
+            b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+        )
+        await parse_file(minimal_pdf, "warmup.pdf")
+        logger.info("[WARMUP] LiteParse parser ready")
+    except Exception as e:
+        logger.warning(f"[WARMUP] Parser warmup failed: {e}")
+
+
+async def _warmup():
+    """Run all warmup tasks in parallel — failures are logged but never block startup."""
+    logger.info("[WARMUP] Pre-loading models and indexes...")
+    await asyncio.gather(
+        _warmup_embeddings(),
+        _warmup_bm25(),
+        _warmup_reranker(),
+        _warmup_parser(),
+        return_exceptions=True,
+    )
+    logger.info("[WARMUP] Done — server is ready to serve requests without cold starts")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Server starting...")
+    await _seed_default_session()
+    await _warmup()
     yield
     logger.info("Server shutting down.")
 

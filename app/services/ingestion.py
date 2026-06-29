@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import tempfile
@@ -34,7 +35,8 @@ async def parse_file(content: bytes, filename: str) -> tuple[str, list[dict]]:
         tmp.write(content)
         tmp_path = tmp.name
     try:
-        result = _parser.parse(tmp_path)
+        # Run in thread pool — LiteParse is CPU-bound and would block the event loop
+        result = await asyncio.to_thread(_parser.parse, tmp_path)
         full_text  = ""
         page_spans = []
         for page in result.pages:

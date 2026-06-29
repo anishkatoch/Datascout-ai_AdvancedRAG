@@ -43,6 +43,16 @@ def _try_openai():
         return None
 
 
+def session_has_data(session_id: str) -> bool:
+    """Return True if the session's vector store has at least one document."""
+    try:
+        store = get_vector_store(session_id)
+        results = store.similarity_search("a", k=1)
+        return len(results) > 0
+    except Exception:
+        return False
+
+
 def get_vector_store(session_id: str):
     logger.info(f"[STORE] Initialising vector store — session={session_id}")
     embeddings = get_embeddings()

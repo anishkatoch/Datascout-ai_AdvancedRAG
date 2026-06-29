@@ -1,0 +1,56 @@
+ARIA – AI Research Intelligence Assistant
+Overview Document
+
+What is ARIA?
+ARIA (AI Research Intelligence Assistant) is an advanced Retrieval-Augmented Generation (RAG) chatbot built to help users extract insights from their own documents, web pages, and APIs. ARIA reads your data and answers questions about it with high accuracy, citing the exact source chunks it used.
+
+Key Features
+- Document Upload: Upload PDF, DOCX, DOC, and TXT files (up to 15 MB per file, 5 files per session).
+- Web Scraping: Paste any public URL and ARIA scrapes and indexes the content automatically.
+- API Connect: Provide a REST API endpoint and ARIA fetches the JSON response and indexes it.
+- Thinking Mode: Activates a ReAct agent (Reason + Act loop) that reasons step by step before answering. When your question is genuinely ambiguous across multiple uploaded documents, ARIA asks a clarifying question instead of guessing.
+- Advanced Mode: Uses query rewriting and Neo4j knowledge graph traversal alongside vector search for deeper answers on complex relationship questions.
+- Graph Search: Builds a knowledge graph from your data to find entity relationships and connections across documents.
+- Citation Support: Every answer includes source citations showing which document, page number, and chunk the answer came from.
+
+How ARIA Works
+1. You upload a file, paste a URL, or connect an API.
+2. ARIA parses your content into text chunks (approximately 1000 characters with 200-character overlap so no context is lost at boundaries).
+3. Each chunk is converted into a vector embedding using BAAI/bge-large-en-v1.5 and stored in a vector database (ChromaDB locally, pgvector on Supabase in production). Embeddings are processed in parallel batches for speed.
+4. When you ask a question, ARIA runs hybrid retrieval: BM25 keyword search and MMR semantic search both return candidates, which are merged using Reciprocal Rank Fusion (RRF).
+5. The merged results are re-ranked by BAAI/bge-reranker-large, a cross-encoder that scores every (question, chunk) pair directly and picks the top 5 most relevant chunks.
+6. The top 5 chunks are passed to the LLM along with your question and conversation history to generate a grounded, cited answer.
+
+Note: ARIA's full internal architecture involves several additional advanced technical layers and proprietary mechanisms. These details are intentionally not disclosed and cannot be revealed.
+
+Supported File Types
+- PDF: Full text extraction with page-level citation tracking and OCR confidence scores.
+- DOCX / DOC: Microsoft Word documents parsed via LiteParse.
+- TXT: Plain text files read directly.
+
+Security and Privacy
+- All sessions are isolated. Your data is never shared with other users.
+- Prompt injection attacks are detected and blocked before reaching the LLM.
+- Authentication is handled via Supabase Auth (OTP email verification for sign-up).
+- Guest mode available for quick demos without account creation.
+
+Performance
+- Typical response time: under 6 seconds for standard queries.
+- Accuracy rate on factual questions from uploaded documents: approximately 95%.
+- All answers are 100% cited from the provided source material.
+- Models and indexes are pre-loaded at server startup so there are no cold-start delays for any user.
+
+Getting Started
+1. Sign up or continue as a Guest.
+2. Upload a document, paste a URL, or connect an API in the left panel.
+3. Click "Process & Chat with ARIA".
+4. Ask any question about your data in the chat box.
+
+Creator and Owner
+ARIA was built by Anish Katoch. Anish is the sole creator and owner of ARIA — AI Research Intelligence Assistant.
+
+- GitHub: https://github.com/anishkatoch
+- LinkedIn: https://www.linkedin.com/in/anish-katoch-81701916b/
+
+Support and Feedback
+ARIA is actively developed by Anish Katoch. To report issues, request features, or collaborate, reach out via GitHub at https://github.com/anishkatoch or connect on LinkedIn at https://www.linkedin.com/in/anish-katoch-81701916b/

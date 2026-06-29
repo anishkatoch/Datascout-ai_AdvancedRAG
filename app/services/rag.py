@@ -31,13 +31,36 @@ _ARIA_SYSTEM = (
     "- Formatting preferences: tables, bullet points, JSON, markdown, numbered lists.\n"
     "- Length preferences: short summary, detailed answer, one sentence, etc.\n"
     "- Language preferences: answer in French, Spanish, simple English, technical, etc.\n"
-    "- Tone preferences: formal, casual, step-by-step, etc.\n"
+    "- Tone preferences: formal, casual, step-by-step, etc.\n\n"
+    "CORRECTION AND TONE RULES:\n"
+    "- If the user says your previous answer was wrong or not what they asked: "
+    "re-read the conversation history carefully, search again with a better query, "
+    "and correct yourself. Acknowledge the mistake once clearly — do not grovel or "
+    "repeat apologies.\n"
+    "- If the user is rude or frustrated but your previous answer was factually correct "
+    "based on the documents: stay calm, do not apologise, calmly clarify what the "
+    "documents say.\n"
+    "- Never apologise more than once per mistake. One clear acknowledgement is enough.\n"
+    "- If the user asks something completely unrelated to the uploaded documents, "
+    "politely say you can only answer questions about the provided data.\n"
 )
 
 # ── Conversation history ──────────────────────────────────────────────────────
 _history_store: dict[str, list[dict]] = {}  # session_id → [{"role": "user"|"assistant", "content": "..."}]
 _history_lock  = threading.Lock()
 _HISTORY_MAX_TURNS = 10  # keep last N user+assistant pairs per session
+
+# ── Clarification flag — tracks if ARIA just asked a clarification question ───
+_clarif_store: dict[str, bool] = {}  # session_id → True if last response was a clarification
+_clarif_lock  = threading.Lock()
+
+def _clarif_was_asked(session_id: str) -> bool:
+    with _clarif_lock:
+        return _clarif_store.get(session_id, False)
+
+def _clarif_set(session_id: str, value: bool):
+    with _clarif_lock:
+        _clarif_store[session_id] = value
 
 
 def _history_get(session_id: str) -> list[dict]:
@@ -615,6 +638,7 @@ def _react_answer(
     session_id: str,
     use_graph: bool,
     history: list[dict],
+    clarify_allowed: bool = True,
 ) -> tuple[str, int, list[dict]]:
     """ReAct loop: Thought → Action → Observation, up to MAX_STEPS, then Final Answer."""
     t0 = time.time()
@@ -642,6 +666,13 @@ def _react_answer(
     tools_desc = "Tools available:\n1. vector_search(query) — search document chunks\n"
     if use_graph:
         tools_desc += "2. graph_search(query) — search entity relationships in the knowledge graph\n"
+    if clarify_allowed:
+        tools_desc += (
+            "3. clarify(question) — ask the user ONE short clarification question "
+            "ONLY when the query is genuinely ambiguous across multiple documents "
+            "and you truly cannot determine which document or entity is meant. "
+            "Use this sparingly — if you can give a reasonable answer, do so instead.\n"
+        )
 
     react_system = (
         f"{_ARIA_SYSTEM}\n\n"
@@ -657,6 +688,12 @@ def _react_answer(
         "- Use 'Final Answer:' when you have enough info\n"
         "- Max 5 search steps then give Final Answer with what you have\n"
         "- Answer only from Observations, not prior knowledge\n"
+        + (
+            "- Use clarify() ONLY when truly ambiguous across multiple documents — "
+            "never for simple or clearly answerable questions\n"
+            "- clarify() is a terminal action — use it instead of Final Answer, never both\n"
+            if clarify_allowed else ""
+        )
     )
 
     messages = [
@@ -700,7 +737,14 @@ def _react_answer(
             return answer, elapsed_ms, _build_citations(all_docs)
 
         # Execute tool
-        if action_line.lower().startswith("vector_search"):
+        if clarify_allowed and action_line.lower().startswith("clarify"):
+            clarification_q = action_line[len("clarify"):].strip().strip("()\"\' ")
+            elapsed_ms = int((time.time() - t0) * 1000)
+            logger.info(f"[REACT] clarify() → '{clarification_q[:80]}'")
+            _clarif_set(session_id, True)
+            return clarification_q, elapsed_ms, []
+
+        elif action_line.lower().startswith("vector_search"):
             query = action_line[len("vector_search"):].strip().strip("()\"\' ")
             observation, docs = _do_vector_search(query)
             all_docs.extend(docs)
@@ -796,6 +840,55 @@ def guard_query(question: str) -> tuple[bool, str | None]:
     return False, None
 
 
+# ── Ambiguity detection ───────────────────────────────────────────────────────
+
+def _check_ambiguity(
+    vectorstore,
+    session_id: str,
+    question: str,
+    history: list[dict],
+) -> str | None:
+    """
+    Return a clarification question string if the query is genuinely ambiguous
+    across multiple distinct source documents, otherwise return None.
+    Only fires when 2+ distinct sources are retrieved and the LLM judges the
+    query as ambiguous.
+    """
+    try:
+        docs = _hybrid_retrieve(vectorstore, session_id, [question])
+        sources = list({d.metadata.get("source", "") for d in docs if d.metadata.get("source")})
+        if len(sources) < 2:
+            return None  # single source — no ambiguity possible
+
+        source_list = "\n".join(f"- {s}" for s in sources)
+        history_block = _history_to_str(history) if history else "None"
+
+        llm = get_llm(advanced=False)
+        prompt = (
+            f"A user asked: \"{question}\"\n\n"
+            f"The knowledge base contains multiple documents:\n{source_list}\n\n"
+            f"Recent conversation:\n{history_block}\n\n"
+            "Decide: is this question genuinely ambiguous — could it refer to different "
+            "things across different documents, leading to a meaningfully different answer "
+            "depending on which document is meant?\n\n"
+            "If YES: write ONE short, natural clarification question to ask the user "
+            "(e.g. 'Are you asking about X in [Doc A] or Y in [Doc B]?'). "
+            "Start your response with 'CLARIFY:' followed by the question.\n"
+            "If NO: respond with exactly 'CLEAR'."
+        )
+        response = llm.invoke([
+            SystemMessage(_ARIA_SYSTEM),
+            HumanMessage(prompt),
+        ]).content.strip()
+
+        if response.upper().startswith("CLARIFY:"):
+            return response[len("CLARIFY:"):].strip()
+        return None
+    except Exception as e:
+        logger.warning(f"[AMBIGUITY] Check failed: {e}")
+        return None
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 def answer_question(
@@ -828,14 +921,33 @@ def answer_question(
     if thinking:
         needs_retrieval = check_intent(question, history)
         if not needs_retrieval:
+            _clarif_set(session_id, False)  # reset flag — clear chitchat turns
             answer, elapsed_ms, citations = _direct_answer(question, history)
             _history_append(session_id, "user", question)
             _history_append(session_id, "assistant", answer)
             return answer, elapsed_ms, citations
 
-        logger.info(f"[CHAT] Running ReAct agent (thinking=True, use_graph={advanced})")
+        # ── Code-level gates: decide if Clarify action is allowed ─────
+        # Gate 1: only allow clarify if 2+ distinct sources exist
+        try:
+            sample_docs = _hybrid_retrieve(vectorstore, session_id, [question])
+            distinct_sources = {d.metadata.get("source", "") for d in sample_docs if d.metadata.get("source")}
+            multi_source = len(distinct_sources) >= 2
+        except Exception:
+            multi_source = False
+
+        # Gate 2: don't clarify if ARIA already asked a clarification last turn
+        already_clarified = _clarif_was_asked(session_id)
+
+        clarify_allowed = multi_source and not already_clarified
+
+        # Reset clarification flag — this turn will set it again if needed
+        _clarif_set(session_id, False)
+
+        logger.info(f"[CHAT] Running ReAct agent (thinking=True, use_graph={advanced}, clarify_allowed={clarify_allowed})")
         answer, elapsed_ms, citations = _react_answer(
-            vectorstore, question, session_id, use_graph=advanced, history=history
+            vectorstore, question, session_id, use_graph=advanced, history=history,
+            clarify_allowed=clarify_allowed,
         )
         _history_append(session_id, "user", question)
         _history_append(session_id, "assistant", answer)

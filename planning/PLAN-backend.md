@@ -786,10 +786,11 @@ retrieval:
 - All models use `max_retries=0` — no 25s SDK waits; our fallback code runs immediately
 - Full chain configurable via `config.yaml`, no code changes needed
 
-### 8b — Embedding Batch Optimisation
+### 8b — Embedding Batch Optimisation ✅ Updated 2026-06-29
 - Old: one `add_texts([chunk])` call per chunk — 40 chunks × 1.3s = 52s
 - New: `_add_texts_batched()` — all chunks in batches of 32 → 7.5× faster
 - `EMBED_BATCH_SIZE = 32` constant prevents HF API payload/timeout errors
+- **2026-06-29 update:** `_add_texts_batched_parallel()` — 3 concurrent batches via `asyncio.Semaphore(3)` + `asyncio.gather`. Batch size raised 32 → 50. 100-chunk doc = 2 parallel batches ≈ 2× faster embedding step.
 
 ### 8c — Response Latency (16s → 8-10s)
 - **Parallel intent + HyDE** — `ThreadPoolExecutor` runs both simultaneously; HyDE cancelled immediately if intent=NO
@@ -797,9 +798,137 @@ retrieval:
 - **Advanced drops HyDE** — advanced mode starts at query-rewrite node, skips HyDE entirely
 - **Answer cache** — MD5-keyed in-memory cache (256 entries, scoped per session+question+mode)
 
+### 8d — Non-Blocking Document Parsing ✅ Done 2026-06-29
+- **Problem:** `_parser.parse()` (LiteParse, CPU-bound) was called directly in the async event loop — during any PDF upload, all other user requests (chat, other uploads) were stalled until parsing finished.
+- **Fix:** `await asyncio.to_thread(_parser.parse, tmp_path)` in `app/services/ingestion.py` — LiteParse runs in the thread pool, event loop stays fully free.
+- **Result:** Multiple users can upload and chat simultaneously with no blocking.
+
 ---
 
-## Phase 9 — Future Enhancements 📋 Planned
+## Phase 9 — Server Warmup (Zero Cold Starts) ✅ Done 2026-06-29
+
+### Problem
+After every server restart, the first user always waited 10–25 seconds extra:
+- HF embedding model connection: ~2–5s first call
+- BM25 index for default session: ~1–2s first query
+- HF reranker connection: ~2–3s first call
+- LiteParse models initialised on first PDF parse: ~3–8s
+
+### Design
+Four async warmup functions run **in parallel** at startup via `asyncio.gather` — after `_seed_default_session()` completes (BM25 needs the sample doc in the vector store first).
+
+| Function | What it does | Why |
+|---|---|---|
+| `_warmup_embeddings()` | `embed_query("warmup")` | Validates HF API key + establishes connection |
+| `_warmup_bm25()` | `_get_or_build_bm25(default_session)` | BM25 index built in RAM, ready for first user |
+| `_warmup_reranker()` | `sentence_similarity("warmup", ...)` | HF InferenceClient connection established |
+| `_warmup_parser()` | Parse a minimal dummy PDF | LiteParse internal models fully initialised |
+
+All 4 wrapped in `try/except` — any failure is logged as a warning and never blocks startup.
+
+```
+Server starting...
+→ _seed_default_session()     ← sample doc seeded (skips if done)
+→ _warmup() — 4 tasks in parallel:
+      ├── [WARMUP] Embedding model ready
+      ├── [WARMUP] BM25 index ready for default session
+      ├── [WARMUP] Reranker ready
+      └── [WARMUP] LiteParse parser ready
+→ "Server is ready to serve requests without cold starts"
+```
+
+### Files changed
+- `app/main.py` — `_warmup_embeddings`, `_warmup_bm25`, `_warmup_reranker`, `_warmup_parser`, `_warmup()`, updated `lifespan()`
+
+---
+
+## Phase 10 — Clarification & Intelligence (Thinking Mode) ✅ Done 2026-06-29
+
+### Problem
+When a user uploads two documents (e.g. two case files) and asks a vague question like "who is the victim?" or "what happened in 2007?", ARIA picked one document arbitrarily and answered without flagging the ambiguity. No mechanism existed to ask the user for clarification.
+
+### Design — Why Not Trust the LLM Alone
+If the LLM decides when to clarify, it over-asks — triggering on clear questions, asking twice, and annoying users. Solution: two hard **code-level gates** must pass before the LLM even sees the `clarify()` option in its prompt.
+
+### 10a — Session Clarification Flag
+
+```python
+_clarif_store: dict[str, bool] = {}   # session_id → True if asked this turn
+_clarif_lock  = threading.Lock()
+
+def _clarif_was_asked(session_id: str) -> bool: ...
+def _clarif_set(session_id: str, value: bool): ...
+```
+
+### 10b — Two Code-Level Gates (run before ReAct call)
+
+**Gate 1 — Multi-source check:**
+```python
+sample_docs   = _hybrid_retrieve(vectorstore, session_id, [question])
+distinct_sources = {d.metadata.get("source", "") for d in sample_docs if d.metadata.get("source")}
+multi_source  = len(distinct_sources) >= 2
+```
+Only possible when 2+ different documents exist in the retrieved results.
+
+**Gate 2 — Already-clarified flag:**
+```python
+already_clarified = _clarif_was_asked(session_id)
+```
+If ARIA asked a clarification last turn, the flag is True → blocked.
+
+```python
+clarify_allowed = multi_source and not already_clarified
+_clarif_set(session_id, False)   # reset before new turn
+```
+
+If `clarify_allowed=False` → `clarify()` is never shown in the ReAct prompt. LLM has no way to use it.
+
+### 10c — Clarify as a Terminal ReAct Action
+
+`Clarify` is NOT a LangChain Tool object — it is a plain text action in the custom ReAct parser, same as `vector_search`. This keeps it outside the LangChain ToolExecutor machinery.
+
+When the agent outputs `Action: clarify(question)`:
+```python
+if clarify_allowed and action_line.lower().startswith("clarify"):
+    clarification_q = action_line[len("clarify"):].strip().strip("()\"\' ")
+    _clarif_set(session_id, True)
+    return clarification_q, elapsed_ms, []   # terminates loop immediately
+```
+
+Terminates the ReAct loop — same behaviour as `Final Answer`. The clarification question is returned as the assistant response and saved to history so the follow-up turn has full context.
+
+### 10d — Ruled Out Approaches
+
+| Approach | Why dropped |
+|---|---|
+| Pre-check function `_check_ambiguity()` before ReAct | Extra LLM call even when not needed — gates do this at zero LLM cost |
+| Word-count gate (skip clarify for short queries) | "who is the victim?" = 4 words and IS ambiguous — count is useless signal |
+| Standard mode clarification | Standard mode is for speed. Complex multi-doc ambiguity warrants Thinking Mode |
+| LangChain Tool object for `Clarify` | ReAct loop is a custom text parser (not AgentExecutor) — Tool binding not needed |
+
+### 10e — Correction & Frustration Handling
+
+Rules added to `_ARIA_SYSTEM` (system prompt), no separate detection function:
+
+1. If user says previous answer was wrong → re-read history, re-search, correct yourself
+2. If you were wrong → acknowledge once clearly, do not repeat the apology
+3. If user is rude but your answer was factually correct → stay calm, do not apologise, clarify what the documents say
+4. Never apologise more than once per mistake
+5. If user asks something unrelated to uploaded documents → politely redirect
+
+**Why system prompt only, not a separate detector:** The ReAct agent already receives full conversation history. It has all the information to reason about whether its previous answer was correct — an extra LLM call would add latency for no benefit.
+
+### Files changed
+- `app/services/rag.py`
+  - `_ARIA_SYSTEM` — added correction + apology rules block
+  - `_clarif_store`, `_clarif_lock`, `_clarif_was_asked()`, `_clarif_set()`
+  - `_react_answer()` — `clarify_allowed` parameter, `clarify` action parser (terminal), conditional Rules section
+  - `answer_question()` — Gate 1 + Gate 2 checks before `_react_answer()`
+- `tests/test_clarification.py` — 26 new tests across 8 test classes
+
+---
+
+## Phase 11 — Future Enhancements 📋 Planned
 
 - **More file types** — CSV, Excel, Markdown, PowerPoint
 - **WhatsApp integration** — already started (`app/routers/whatsapp.py`) — needs Twilio webhook setup

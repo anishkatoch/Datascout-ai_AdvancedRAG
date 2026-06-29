@@ -12,7 +12,7 @@ const state = {
   activeTab:    'files',
   files:        [],
   isProcessing: false,
-  isReady:      false,
+  isReady:      true,
   advancedMode: false,
   thinkingMode: false,
   authToken:    null,
@@ -117,18 +117,30 @@ function handleAuthError(res) {
   return false;
 }
 
+function _uuid() {
+  try { return crypto.randomUUID(); } catch (_) {}
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 function initClientToken() {
   let token = localStorage.getItem('rag_client_token');
   if (!token) {
     try {
       token = crypto.randomUUID();
     } catch (_) {
-      // crypto.randomUUID() requires HTTPS or localhost — use a fallback
       token = 'uid-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
     }
     localStorage.setItem('rag_client_token', token);
   }
   state.clientToken = token;
+
+  // Always have a valid UUID session ID — back-end falls back to sample if session is empty
+  if (!state.sessionId) {
+    state.sessionId = _uuid();
+  }
 }
 
 function initAdvancedMode() {
@@ -181,45 +193,56 @@ function setupTabs() {
 function setupDragDrop() {
   const zone    = document.getElementById('drop-zone');
   const overlay = document.getElementById('drag-overlay');
-  let dragCounter = 0;
+  let leaveTimer = null;
 
-  // ── Whole-page drag listeners (catch files dragged anywhere on page) ──
-  document.addEventListener('dragenter', e => {
-    // Only react to file drags, not element drags
-    if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return;
-    e.preventDefault();
-    dragCounter++;
+  const dropTitle = zone.querySelector('.drop-title');
+  const origTitle = dropTitle ? dropTitle.textContent : '';
+
+  function isFileDrag(e) {
+    try { return [...e.dataTransfer.types].includes('Files'); } catch { return false; }
+  }
+  function processFiles(e) {
+    const files = e.dataTransfer ? [...e.dataTransfer.files] : [];
+    if (files.length > 0) addFiles(files);
+  }
+  function showDrag() {
+    clearTimeout(leaveTimer);
     overlay.classList.remove('hidden');
     zone.classList.add('dragover');
-  });
+    if (dropTitle) dropTitle.textContent = 'Release to drop';
+  }
+  function hideDrag() {
+    clearTimeout(leaveTimer);
+    overlay.classList.add('hidden');
+    zone.classList.remove('dragover');
+    if (dropTitle) dropTitle.textContent = origTitle;
+  }
 
+  // ── Single drop handler on document catches everything ───────
+  document.addEventListener('dragenter', e => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    showDrag();
+  });
   document.addEventListener('dragover', e => {
-    if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return;
+    if (!isFileDrag(e)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
   });
-
   document.addEventListener('dragleave', e => {
-    if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return;
-    // Only hide overlay when leaving the browser window entirely
-    if (e.clientX === 0 && e.clientY === 0) {
-      dragCounter = 0;
-      overlay.classList.add('hidden');
-      zone.classList.remove('dragover');
-    }
+    if (!isFileDrag(e)) return;
+    leaveTimer = setTimeout(() => hideDrag(), 50);
   });
-
   document.addEventListener('drop', e => {
+    if (!e.dataTransfer) return;
     e.preventDefault();
-    dragCounter = 0;
-    overlay.classList.add('hidden');
-    zone.classList.remove('dragover');
-    const files = e.dataTransfer ? [...e.dataTransfer.files] : [];
-    if (files.length > 0) addFiles(files);
+    e.stopPropagation();
+    hideDrag();
+    processFiles(e);
   });
 
   // ── Zone click → open file browser ───────────────────────────
-  zone.addEventListener('click', (e) => {
+  zone.addEventListener('click', e => {
     if (e.target.closest('.browse-btn')) return;
     document.getElementById('file-input').click();
   });
@@ -660,7 +683,11 @@ async function sendMessage() {
     });
     if (handleAuthError(res)) return;
     const data = await safeJson(res);
-    if (!res.ok) throw new Error(data?.detail || `Server error ${res.status}`);
+    if (!res.ok) {
+      const detail = data?.detail;
+      const msg = Array.isArray(detail) ? (detail[0]?.msg || 'Request error') : (detail || `Server error ${res.status}`);
+      throw new Error(msg);
+    }
     appendMessage('bot', data.answer, data.elapsed_ms, data.citations || []);
   } catch (err) {
     appendMessage('bot', `Error: ${err.message}`);
@@ -816,6 +843,14 @@ function setProcessing(on) {
 function autoResize(el) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+
+/* ── Sidebar hamburger toggle (mobile) ──────────────────────── */
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const btn     = document.getElementById('sidebar-hamburger');
+  sidebar.classList.toggle('collapsed');
+  btn.classList.toggle('collapsed');
 }
 
 /* ── Toast ───────────────────────────────────────────────────── */

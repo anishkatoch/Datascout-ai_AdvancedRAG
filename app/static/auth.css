@@ -82,6 +82,7 @@ html, body {
   position: relative;
   overflow-y: auto;
   z-index: 1;
+  transition: flex 0.35s ease, padding 0.35s ease;
 }
 
 /* Orb elements kept in HTML but invisible — page-level glows replace them */
@@ -602,12 +603,22 @@ html, body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.2); border-radius: 99px; }
 
+
 /* Mobile */
 @media (max-width: 820px) {
   .auth-page { flex-direction: column; overflow-y: auto; height: auto; min-height: 100vh; }
   html, body { overflow: auto; }
-  .auth-left { flex: none; padding: 40px 28px 32px; }
-  .al-demo { display: none; }
+
+  /* Left panel */
+  .auth-left {
+    flex: none;
+    padding: 20px 24px 24px;
+    overflow: hidden;
+    transition: max-height 0.35s ease, padding 0.35s ease;
+    max-height: 1000px;
+  }
+  .al-demo { display: block; }
+
   .auth-right { padding: 24px 20px 40px; }
   .auth-card { max-width: 100%; }
 }

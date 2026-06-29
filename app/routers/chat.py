@@ -3,8 +3,9 @@ import time
 from fastapi import APIRouter, HTTPException, Header
 
 from app.models.schemas import ChatRequest, ChatResponse
-from app.services.vector_store import get_vector_store
+from app.services.vector_store import get_vector_store, session_has_data
 from app.services.rag import answer_question
+from app.config import DEFAULT_SESSION_ID
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -25,7 +26,12 @@ async def chat(
         f"question='{request.question[:80]}{'...' if len(request.question) > 80 else ''}'"
     )
     try:
-        vector_store = get_vector_store(str(request.session_id))
+        session_id = str(request.session_id)
+        # Fall back to the sample session if the user hasn't uploaded anything yet
+        if not session_has_data(session_id):
+            session_id = DEFAULT_SESSION_ID
+            logger.info(f"[CHAT] No data in session — using default sample session")
+        vector_store = get_vector_store(session_id)
         answer, elapsed_ms, citations = answer_question(
             vectorstore=vector_store,
             question=request.question,

@@ -39,19 +39,26 @@ class TestFileCountValidation:
     def test_exact_max_files_passes_validation(self):
         """Exact file count limit must not be rejected by the count check."""
         client = _make_client()
-        # Use .txt files — no LiteParse needed, no extra mocking required
-        files = [("files", (f"note{i}.txt", b"hello world", "text/plain"))
+        # Each file must have unique content to avoid dedup cache hits (same hash
+        # across files triggers a confirm gate that blocks the SSE stream).
+        files = [("files", (f"note{i}.txt", f"unique content for file {i} abcdef".encode(), "text/plain"))
                  for i in range(cfg.max_files_per_session)]
 
         mock_store = MagicMock()
         mock_store.add_texts = MagicMock()
 
+        from app.services.dedup import _mem_cache
+        _mem_cache.clear()
+
         with patch("app.routers.upload.get_vector_store", return_value=mock_store), \
              patch("app.services.dedup._get_db_session", return_value=None):
-            res = client.post("/upload/files", files=files, headers={"X-Client-Token": "t1"})
+            with client.stream("POST", "/upload/files", files=files,
+                               headers={"X-Client-Token": "t1-unique"}) as response:
+                # Drain the SSE stream — we only care it doesn't 400 with "Maximum"
+                events = list(response.iter_lines())
         # 400 is only acceptable if NOT about file count
-        if res.status_code == 400:
-            assert "Maximum" not in res.json().get("detail", "")
+        if response.status_code == 400:
+            assert "Maximum" not in response.text
 
     def test_one_file_is_allowed(self):
         client = _make_client()

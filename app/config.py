@@ -95,3 +95,6 @@ class _Config:
 
 
 cfg = _Config(_y)
+
+# Fixed session ID for the built-in sample document
+DEFAULT_SESSION_ID = "aria_default_sample"

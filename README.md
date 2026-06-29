@@ -20,13 +20,14 @@ Chat with your data. Upload PDFs, scrape URLs, or pull from JSON APIs — then a
 |---|---|
 | **API Server** | FastAPI + uvicorn |
 | **Runtime** | Python 3.13 + uv |
+| **Auth** | Supabase OTP (email magic link) + guest mode |
 | **LLM** | Groq `llama-3.1-8b-instant` (primary, free) → 4 Groq fallback models → OpenAI `gpt-4o-mini` (last resort) |
 | **RAG Orchestration** | LangGraph state machine |
 | **Hybrid Search** | BM25 (keyword) + MMR (semantic) → RRF merge → BGE Reranker |
 | **Graph DB** | Neo4j AuraDB — entity & relationship traversal (Advanced Mode) |
 | **Vector Store** | ChromaDB local (default) → pgvector on Supabase (optional) |
 | **Embeddings** | `BAAI/bge-large-en-v1.5` via HuggingFace Inference API (free) → OpenAI fallback |
-| **Document Parsing** | LiteParse v2 — Rust-based, page-level metadata |
+| **Document Parsing** | LiteParse v2 — Rust-based, page-level metadata, runs off event loop |
 | **URL Scraping** | Crawl4AI → Playwright Chromium fallback |
 | **Container** | Docker — Python 3.13-slim, non-root user |
 | **Deployment** | HuggingFace Spaces (free) |
@@ -42,7 +43,7 @@ When you upload a file, paste a URL, or provide an API endpoint, the system:
 
 1. **Parses** the content — LiteParse v2 extracts text with page numbers and OCR confidence scores per page
 2. **Chunks** the text — splits into overlapping chunks (~1000 chars, 200 overlap) so no context is lost at boundaries
-3. **Embeds** the chunks — converts each chunk to a vector using `BAAI/bge-large-en-v1.5` (batched in groups of 32 for speed)
+3. **Embeds** the chunks — converts each chunk to a vector using `BAAI/bge-large-en-v1.5` (batched in groups of 50, 3 batches in parallel for speed)
 4. **Stores** vectors in ChromaDB (or pgvector) — scoped to your session ID so your data stays private
 5. **Builds a knowledge graph** — extracts entities and relationships from each chunk and stores them in Neo4j (used in Advanced Mode)
 
@@ -153,6 +154,31 @@ Your message
                           v
                     Silent fallback to Standard Mode
 ```
+
+#### Thinking Mode (toggle in the UI)
+
+Thinking Mode replaces the LangGraph pipeline with a **ReAct agent** (Reason + Act loop). The agent shows its reasoning step by step before answering — useful when you want to see exactly how the answer was derived.
+
+```
+Your message
+      |
+      v
+[Thought]  "I need to find information about X..."
+      |
+      v
+[Action]   vector_search("X") | bm25_search("X") | graph_search("X") | clarify(question)
+      |
+      v
+[Observation]  Retrieved chunks shown to the agent
+      |
+      v
+[Thought]  "Based on the context, the answer is..."
+      |
+      v
+[Final Answer]  Response with citations
+```
+
+**Clarification:** When you have 2+ documents uploaded and ask a vague question (e.g. "who is the victim?" when two different case files are loaded), the agent can ask a clarifying question instead of guessing. This only triggers when the question is genuinely ambiguous across multiple sources — the system uses hard code-level checks before the agent even sees the option, so it never over-asks or asks twice.
 
 ---
 
@@ -266,10 +292,13 @@ Model names, retrieval tuning, and upload limits are all in `config.yaml` — ed
 - **URL scraping** — paste any URL and chat with the page content. Handles JS-rendered pages.
 - **JSON API ingestion** — point at any API endpoint, add auth headers if needed.
 - **Cited answers** — every answer shows source file, page number, and OCR confidence.
+- **Thinking Mode** — ReAct agent that shows step-by-step reasoning. Includes clarification when your question is genuinely ambiguous across multiple documents.
 - **Advanced Mode** — toggle in the chat UI for deeper answers using graph traversal.
 - **Multi-turn chat** — follow-up messages use full conversation context.
 - **Real-time upload progress** — each step (parse → chunk → embed → store) streams live.
 - **Automatic fallbacks** — LLM, embeddings, and vector store all have fallback providers.
+- **Zero cold starts** — embeddings, BM25 index, reranker, and document parser are all pre-loaded at server startup so the first user after a restart gets instant responses.
+- **Auth** — Supabase OTP email login or continue as guest. Chat and upload routes are protected; only the auth page is public.
 
 ---
 
@@ -278,13 +307,18 @@ Model names, retrieval tuning, and upload limits are all in `config.yaml` — ed
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/health` | Health check — `{"status": "ok"}` |
+| `POST` | `/auth/send-otp` | Send OTP email for login |
+| `POST` | `/auth/verify-otp` | Verify OTP — returns JWT |
+| `POST` | `/auth/guest` | Get a guest token (no email needed) |
 | `POST` | `/upload/files` | Upload PDF/DOC/DOCX/TXT — streams SSE progress |
 | `POST` | `/upload/url` | Scrape a URL — streams SSE progress |
 | `POST` | `/upload/api` | Fetch a JSON API with optional auth headers |
 | `POST` | `/chat/` | Ask a question — returns answer + citations + elapsed_ms |
 
-**Chat headers:**
+**Upload/Chat headers:**
+- `Authorization: Bearer <token>` — required on all `/upload/` and `/chat/` routes
 - `X-Advanced-Mode: true` — enables Advanced Mode pipeline
+- `X-Thinking-Mode: true` — enables Thinking Mode (ReAct agent with step-by-step reasoning)
 
 ---
 
@@ -292,16 +326,18 @@ Model names, retrieval tuning, and upload limits are all in `config.yaml` — ed
 
 ```
 app/
-├── main.py              # FastAPI app, lifespan
+├── main.py              # FastAPI app, lifespan, server warmup
 ├── config.py            # Loads config.yaml + .env
 ├── routers/
-│   ├── upload.py        # Upload endpoints (SSE streaming)
-│   └── chat.py          # Chat endpoint
+│   ├── upload.py        # Upload endpoints (SSE streaming, parallel embedding)
+│   ├── chat.py          # Chat endpoint
+│   └── auth.py          # OTP login + guest token endpoints
 ├── services/
-│   ├── rag.py           # LangGraph pipelines, intent, history, cache, fallbacks
-│   ├── ingestion.py     # LiteParse, Crawl4AI, Playwright, httpx
+│   ├── rag.py           # LangGraph pipelines, ReAct agent (Thinking Mode), intent, history, cache, fallbacks
+│   ├── ingestion.py     # LiteParse (non-blocking), Crawl4AI, Playwright, httpx
 │   ├── vector_store.py  # Embedding + vector store with fallback
-│   └── dedup.py         # Duplicate file detection
+│   ├── dedup.py         # Duplicate file detection (SHA-256 + TF-IDF)
+│   └── auth_service.py  # Supabase OTP + JWT verification
 ├── models/
 │   ├── db.py            # SQLAlchemy models
 │   └── schemas.py       # Pydantic schemas
@@ -311,7 +347,9 @@ app/
 
 alembic/                 # Migration scripts
 config.yaml              # Model names, retrieval params, limits
-tests/                   # pytest suite (31 tests)
+planning/                # PLAN.md, PLAN-backend.md, PLAN-frontend.md
+ISSUES_FIXES.md          # Issues found and fixes made (running log)
+tests/                   # pytest suite (136 tests)
 pyproject.toml           # Dependencies + uv scripts
 Dockerfile
 ```

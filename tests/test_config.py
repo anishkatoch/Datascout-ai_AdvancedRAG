@@ -13,7 +13,7 @@ class TestYamlSettings:
         assert cfg.port == 8001
 
     def test_groq_model(self):
-        assert cfg.groq_model == "llama-3.3-70b-versatile"
+        assert cfg.groq_model == "llama-3.1-8b-instant"
 
     def test_embedding_provider(self):
         assert cfg.embedding_provider == "bge"
@@ -44,7 +44,7 @@ class TestYamlSettings:
         assert cfg.max_session_size_mb == 50
 
     def test_dedup_threshold_mb(self):
-        assert cfg.dedup_threshold_mb == 2.0
+        assert cfg.dedup_threshold_mb == 2.0  # files under 2 MB skip TF-IDF
 
 
 class TestDbUrl:
